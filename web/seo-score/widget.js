@@ -66,7 +66,6 @@
     ".sss-btn-ghost:hover{box-shadow:none;border-color:var(--sss-accent)}" +
     ".sss-form .sss-btn{justify-self:start}" +
     "@media(max-width:600px){.sss-form .sss-btn{justify-self:stretch}}" +
-    ".sss-note{font-size:13px;margin:0}" +
     ".sss-error{color:var(--sss-bad);font-size:14px;min-height:1em}" +
     ".sss-loading{text-align:center;padding:32px 0}" +
     ".sss-loading p{color:var(--sss-heading);font:700 18px/1.3 var(--sss-head-font);margin:16px 0 4px}" +
@@ -415,7 +414,6 @@
       form.appendChild(hp);
       form.appendChild(err);
       form.appendChild(btn);
-      form.appendChild(el("p", { class: "sss-note", text: "100% gratis · Geen verkooppraatje · Direct resultaat" }));
       card.appendChild(form);
 
       form.addEventListener("submit", function (e) {
