@@ -11,12 +11,17 @@
  *        data-cta-url="/contact"
  *        data-cta-text="Plan een kennismaking"
  *        data-whatsapp="31620405236"
- *        data-theme="donker"></div>
+ *        data-theme="donker"
+ *        data-variant="test"></div>
  *   <script src="https://JOUW-PROJECT.vercel.app/widget.js" defer></script>
  *
  * All data-* attributes are optional; data-api defaults to the host serving
  * this script. data-theme: "donker" (default, navy card) or "licht"
- * (lavender card, for light page sections). Styles are scoped under .sss.
+ * (lavender card, for light page sections). data-variant: "contrast",
+ * "vraag", "kompas", "kort", or "test" (default: random per visitor, sticky,
+ * reported to the dataLayer and the lead webhook for A/B testing).
+ * data-title / data-intro override the headline and intro text.
+ * Styles are scoped under .sss.
  */
 (function () {
   "use strict";
@@ -99,6 +104,42 @@
     "@media(max-width:600px){.sss-actions .sss-btn{flex:1 1 100%;padding:16px 18px;text-align:center}}" +
     ".sss-link{background:none;border:0;color:var(--sss-accent);text-decoration:underline;cursor:pointer;font:600 14px var(--sss-head-font);padding:0;margin-top:16px}";
 
+  // Headline variants (A/B test). Keys are sent to GA4 and the lead webhook.
+  var VARIANTS = {
+    contrast: {
+      title: "Geen dik rapport, maar direct je SEO-score.",
+      intro: "Vul je website en e-mailadres in. Je ziet meteen hoe je scoort in Google en wat je als eerste moet aanpakken."
+    },
+    vraag: {
+      title: "Hoe goed scoort jouw website in Google?",
+      intro: "Check het gratis. Vul je website en e-mailadres in en zie binnen 15 seconden je score en je belangrijkste verbeterpunten."
+    },
+    kompas: {
+      title: "Check je koers in Google.",
+      intro: "Weet waar je staat en welke kant je op moet. Vul je website en e-mailadres in en ontvang direct je SEO-score met concrete verbeterpunten."
+    },
+    kort: {
+      title: "Je SEO-score in 15 seconden.",
+      intro: "Vul je website en e-mailadres in. Geen verkooppraatje, gewoon je score en wat je eraan kunt doen."
+    }
+  };
+  var STORAGE_KEY = "sent-seo-score-variant";
+
+  function pickVariant(requested) {
+    if (VARIANTS[requested]) return requested;
+    var keys = Object.keys(VARIANTS), stored = null;
+    try { stored = window.localStorage.getItem(STORAGE_KEY); } catch (e) { /* storage blocked */ }
+    if (VARIANTS[stored]) return stored;
+    var pick = keys[Math.floor(Math.random() * keys.length)];
+    try { window.localStorage.setItem(STORAGE_KEY, pick); } catch (e) { /* storage blocked */ }
+    return pick;
+  }
+
+  function track(payload) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(payload);
+  }
+
   function el(tag, attrs, children) {
     var n = document.createElement(tag);
     if (attrs) Object.keys(attrs).forEach(function (k) {
@@ -159,6 +200,12 @@
     var ctaUrl = root.dataset.ctaUrl || "/contact";
     var ctaText = root.dataset.ctaText || "Plan een kennismaking";
     var whatsapp = (root.dataset.whatsapp || "").replace(/\D/g, "");
+    var variant = pickVariant(root.dataset.variant);
+    var copy = {
+      title: root.dataset.title || VARIANTS[variant].title,
+      intro: root.dataset.intro || VARIANTS[variant].intro
+    };
+    var viewTracked = false;
 
     root.classList.add("sss");
     if (!root.dataset.theme) root.dataset.theme = "donker";
@@ -170,8 +217,9 @@
       prefill = prefill || {};
       card.innerHTML = "";
       card.appendChild(el("span", { class: "sss-tag", text: "Gratis SEO-scan" }));
-      card.appendChild(el("h2", { class: "sss-title", text: "Geen giswerk. Gewoon je SEO-score." }));
-      card.appendChild(el("p", { class: "sss-intro", text: "Vul je website en e-mailadres in. Binnen 15 seconden zie je hoe je scoort in Google, en wat je als eerste moet aanpakken." }));
+      card.appendChild(el("h2", { class: "sss-title", text: copy.title }));
+      card.appendChild(el("p", { class: "sss-intro", text: copy.intro }));
+      if (!viewTracked) { viewTracked = true; track({ event: "seo_score_view", seo_score_variant: variant }); }
 
       var form = el("form", { class: "sss-form", novalidate: "" });
       var urlIn = el("input", { type: "text", name: "url", id: "sss-url", placeholder: "jouwwebsite.nl", required: "", inputmode: "url", autocomplete: "url" });
@@ -202,7 +250,7 @@
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         err.textContent = "";
-        var data = { url: urlIn.value.trim(), email: mailIn.value.trim(), consent: consent.checked, website: hp.value };
+        var data = { url: urlIn.value.trim(), email: mailIn.value.trim(), consent: consent.checked, website: hp.value, variant: variant };
         if (!data.url) { err.textContent = "Vul de URL van je website in."; urlIn.focus(); return; }
         if (!/^\S+@\S+\.\S+$/.test(data.email)) { err.textContent = "Vul een geldig e-mailadres in."; mailIn.focus(); return; }
         if (!data.consent) { err.textContent = "Vink het vakje aan, dan kunnen we je de uitslag sturen."; return; }
@@ -226,7 +274,7 @@
         .then(function (res) {
           if (!res.ok) throw new Error(res.body && res.body.error || "Er ging iets mis.");
           renderResult(res.body, data);
-          if (window.dataLayer) window.dataLayer.push({ event: "seo_score_generated", seo_score: res.body.score });
+          track({ event: "seo_score_generated", seo_score: res.body.score, seo_score_variant: variant });
         })
         .catch(function (e) {
           renderForm(data);

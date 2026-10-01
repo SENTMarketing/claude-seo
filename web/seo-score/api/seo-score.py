@@ -2,9 +2,11 @@
 Vercel serverless endpoint: POST /api/seo-score
 
 Request (JSON):
-    {"url": "voorbeeld.nl", "email": "naam@bedrijf.nl", "consent": true, "website": ""}
+    {"url": "voorbeeld.nl", "email": "naam@bedrijf.nl", "consent": true, "website": "",
+     "variant": "contrast"}
 
     `website` is a honeypot field: real visitors never fill it; bots do.
+    `variant` is the headline variant shown (A/B test), forwarded to the webhook.
 
 Response 200 (JSON): the report from `seo_score_engine.score_url` (score, grade,
 categories, top_priorities, checks).
@@ -37,6 +39,7 @@ import requests  # noqa: E402
 
 from seo_score_engine import ScoreError, score_url  # noqa: E402
 
+VARIANT_RE = re.compile(r"^[a-z0-9-]{1,32}$")
 EMAIL_RE = re.compile(r"^[^@\s<>\"']{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}$")
 MAX_BODY = 4096
 _hits: dict[str, deque] = defaultdict(deque)
@@ -69,7 +72,13 @@ def rate_limited(ip: str, now: float | None = None) -> bool:
     return False
 
 
-def send_lead(email: str, report: dict, origin: str) -> None:
+def clean_variant(value) -> str:
+    """Return the A/B headline variant if well-formed, else an empty string."""
+    value = str(value or "")
+    return value if VARIANT_RE.match(value) else ""
+
+
+def send_lead(email: str, report: dict, origin: str, variant: str = "") -> None:
     """Forward the lead to the configured webhook. Never raises."""
     hook = os.environ.get("LEAD_WEBHOOK_URL")
     if not hook:
@@ -83,6 +92,7 @@ def send_lead(email: str, report: dict, origin: str) -> None:
         "categories": {k: v["score"] for k, v in report.get("categories", {}).items()},
         "top_priorities": [p["label"] for p in report.get("top_priorities", [])],
         "source": origin or "seo-score-widget",
+        "variant": variant,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     headers = {"Content-Type": "application/json"}
@@ -156,7 +166,7 @@ class handler(BaseHTTPRequestHandler):  # noqa: N801 - name required by Vercel
         except Exception:  # noqa: BLE001 - never leak internals to visitors
             return self._send(500, {"error": "Er ging iets mis bij het analyseren. Probeer het later opnieuw."})
 
-        send_lead(email, report, self.headers.get("Origin", ""))
+        send_lead(email, report, self.headers.get("Origin", ""), clean_variant(data.get("variant")))
         return self._send(200, report)
 
     def do_GET(self):  # noqa: N802
