@@ -66,6 +66,7 @@ Voeg op de SEO-pagina een **Embed**-element (Webflow) of **Aangepaste HTML**-blo
 | `data-cta-url` / `data-cta-text` | `/contact` / "Plan een kennismaking" | Hoofdknop na de uitslag |
 | `data-whatsapp` | leeg (geen knop) | Nummer in internationaal formaat; toont een WhatsApp-knop met de score als vooringevuld bericht |
 | `data-theme` | `donker` | `donker` (navy kaart) of `licht` (lavendel kaart, voor lichte secties) |
+| `data-title` / `data-intro` | "Je SEO-score in 15 seconden." / standaardintro | Eigen kop en introtekst |
 
 ### Huisstijl
 

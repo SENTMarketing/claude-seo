@@ -16,7 +16,8 @@
  *
  * All data-* attributes are optional; data-api defaults to the host serving
  * this script. data-theme: "donker" (default, navy card) or "licht"
- * (lavender card, for light page sections). Styles are scoped under .sss.
+ * (lavender card, for light page sections). data-title / data-intro
+ * override the headline and intro text. Styles are scoped under .sss.
  */
 (function () {
   "use strict";
@@ -159,6 +160,8 @@
     var ctaUrl = root.dataset.ctaUrl || "/contact";
     var ctaText = root.dataset.ctaText || "Plan een kennismaking";
     var whatsapp = (root.dataset.whatsapp || "").replace(/\D/g, "");
+    var title = root.dataset.title || "Je SEO-score in 15 seconden.";
+    var intro = root.dataset.intro || "Vul je website en e-mailadres in. Geen verkooppraatje, gewoon je score en wat je eraan kunt doen.";
 
     root.classList.add("sss");
     if (!root.dataset.theme) root.dataset.theme = "donker";
@@ -170,8 +173,8 @@
       prefill = prefill || {};
       card.innerHTML = "";
       card.appendChild(el("span", { class: "sss-tag", text: "Gratis SEO-scan" }));
-      card.appendChild(el("h2", { class: "sss-title", text: "Geen giswerk. Gewoon je SEO-score." }));
-      card.appendChild(el("p", { class: "sss-intro", text: "Vul je website en e-mailadres in. Binnen 15 seconden zie je hoe je scoort in Google, en wat je als eerste moet aanpakken." }));
+      card.appendChild(el("h2", { class: "sss-title", text: title }));
+      card.appendChild(el("p", { class: "sss-intro", text: intro }));
 
       var form = el("form", { class: "sss-form", novalidate: "" });
       var urlIn = el("input", { type: "text", name: "url", id: "sss-url", placeholder: "jouwwebsite.nl", required: "", inputmode: "url", autocomplete: "url" });
