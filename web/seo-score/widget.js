@@ -376,7 +376,7 @@
     var ctaBody = "Je spreekt direct met Stan of Timo, geen accountmanager. Binnen 24 uur contact.";
     var whatsapp = (root.dataset.whatsapp || "").replace(/\D/g, "");
     var title = root.dataset.title || "Je SEO-score in 15 seconden.";
-    var intro = root.dataset.intro || "Vul je website en e-mailadres in. Geen verkooppraatje, gewoon je score en wat je eraan kunt doen.";
+    var intro = root.dataset.intro || "Vul je website en e-mailadres in en zie direct hoe je scoort en wat je als eerste aanpakt.";
 
     root.classList.add("sss");
     if (!root.dataset.theme) root.dataset.theme = "donker";
