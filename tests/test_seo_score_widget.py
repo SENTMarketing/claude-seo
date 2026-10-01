@@ -137,17 +137,9 @@ def test_send_lead_posts_payload(monkeypatch):
     report = {"url": "https://voorbeeld.nl", "score": 72, "grade": "Goed",
               "categories": {"technisch": {"score": 80}}, "top_priorities": [{"label": "H1-kop"}]}
     with patch.object(api.requests, "post") as post:
-        api.send_lead("a@b.nl", report, "https://www.sent-marketing.nl", "kompas")
+        api.send_lead("a@b.nl", report, "https://www.sent-marketing.nl")
     kwargs = post.call_args.kwargs
     assert kwargs["json"]["email"] == "a@b.nl"
     assert kwargs["json"]["score"] == 72
     assert kwargs["json"]["categories"] == {"technisch": 80}
     assert kwargs["headers"]["X-Webhook-Secret"] == "s3cret"
-    assert kwargs["json"]["variant"] == "kompas"
-
-
-@pytest.mark.parametrize("raw,expected", [
-    ("contrast", "contrast"), ("kort", "kort"), (None, ""), ("<script>", ""), ("x" * 40, ""),
-])
-def test_clean_variant(raw, expected):
-    assert api.clean_variant(raw) == expected

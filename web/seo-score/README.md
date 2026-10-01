@@ -55,8 +55,7 @@ Voeg op de SEO-pagina een **Embed**-element (Webflow) of **Aangepaste HTML**-blo
      data-cta-url="/contact"
      data-cta-text="Plan een kennismaking"
      data-whatsapp="31620405236"
-     data-theme="donker"
-     data-variant="test"></div>
+     data-theme="donker"></div>
 <script src="https://<project>.vercel.app/widget.js" defer></script>
 ```
 
@@ -67,27 +66,6 @@ Voeg op de SEO-pagina een **Embed**-element (Webflow) of **Aangepaste HTML**-blo
 | `data-cta-url` / `data-cta-text` | `/contact` / "Plan een kennismaking" | Hoofdknop na de uitslag |
 | `data-whatsapp` | leeg (geen knop) | Nummer in internationaal formaat; toont een WhatsApp-knop met de score als vooringevuld bericht |
 | `data-theme` | `donker` | `donker` (navy kaart) of `licht` (lavendel kaart, voor lichte secties) |
-| `data-variant` | `test` | Kop-variant: `contrast`, `vraag`, `kompas`, `kort`, of `test` (A/B-test) |
-| `data-title` / `data-intro` | per variant | Eigen kop/introtekst (overschrijft de variant) |
-
-### Kop-varianten (A/B-test)
-
-| Variant | Kop |
-|---|---|
-| `contrast` | Geen dik rapport, maar direct je SEO-score. |
-| `vraag` | Hoe goed scoort jouw website in Google? |
-| `kompas` | Check je koers in Google. |
-| `kort` | Je SEO-score in 15 seconden. |
-
-Met `data-variant="test"` (standaard) krijgt elke bezoeker willekeurig één
-variant, die bewaard blijft voor volgende bezoeken. Meten:
-
-- **GA4 / GTM**: events `seo_score_view` en `seo_score_generated`, beide met
-  `seo_score_variant`. Conversie per variant = generated ÷ view.
-- **Leads**: het veld `variant` zit in de webhook-payload.
-
-Kies na voldoende data (vuistregel: ~100 scans per variant) de winnaar en zet
-`data-variant` vast op die waarde.
 
 ### Huisstijl
 
@@ -133,7 +111,6 @@ Payload:
   "categories": {"technisch": 80, "content": 57, "structuur": 67, "zichtbaarheid": 50},
   "top_priorities": ["Gestructureerde data", "Meta description"],
   "source": "https://www.sent-marketing.nl",
-  "variant": "kompas",
   "created_at": "2026-10-01T10:00:00+00:00"
 }
 ```
