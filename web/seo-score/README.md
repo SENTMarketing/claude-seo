@@ -53,14 +53,39 @@ Voeg op de SEO-pagina een **Embed**-element (Webflow) of **Aangepaste HTML**-blo
      data-api="https://<project>.vercel.app/api/seo-score"
      data-privacy-url="/privacy"
      data-cta-url="/contact"
-     data-cta-text="Plan een gratis SEO-adviesgesprek"></div>
+     data-cta-text="Plan een kennismaking"
+     data-whatsapp="31620405236"
+     data-theme="donker"></div>
 <script src="https://<project>.vercel.app/widget.js" defer></script>
 ```
 
-De widget neemt het lettertype van je site over. Kleuren pas je aan via CSS:
+| Attribuut | Standaard | Doel |
+|---|---|---|
+| `data-api` | host van `widget.js` | URL van het endpoint |
+| `data-privacy-url` | `/privacy` | Link in de toestemmingstekst |
+| `data-cta-url` / `data-cta-text` | `/contact` / "Plan een kennismaking" | Hoofdknop na de uitslag |
+| `data-whatsapp` | leeg (geen knop) | Nummer in internationaal formaat; toont een WhatsApp-knop met de score als vooringevuld bericht |
+| `data-theme` | `donker` | `donker` (navy kaart) of `licht` (lavendel kaart, voor lichte secties) |
+
+### Huisstijl
+
+De widget volgt de SENT-huisstijl (bron: *SENT huisstijl – AI-referentie* en
+*Bedrijfsplan V2*):
+
+- Kleuren: navy `#10173B` als basis, helder blauw `#3FA9F5` als accent/CTA,
+  lavendel `#E0E6FF` voor koppen, `#9DA5C5` / `#4A516E` voor subtekst.
+- Montserrat (ExtraBold koppen, Bold knoppen en labels); lopende tekst neemt
+  het bodyfont van de site over. Montserrat wordt alleen geladen als de site
+  het nog niet laadt.
+- Pilvormige knoppen en tags (radius 48px), twee "gloed"-vormen op de kaart.
+- Het kompas als subtiel motief: de naald in de scorering en de laadanimatie
+  ("We bepalen je koers…").
+- Tone of voice: je/jij, kort en direct, met het contrast "Geen …, maar …".
+
+Kleuren zijn CSS-variabelen en kunnen per pagina worden overschreven:
 
 ```css
-#sent-seo-score { --sss-accent: #e4572e; }
+#sent-seo-score { --sss-accent: #3FA9F5; --sss-navy: #10173B; }
 ```
 
 Na een succesvolle scan wordt een `seo_score_generated`-event naar de
