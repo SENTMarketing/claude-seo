@@ -11,6 +11,7 @@ web/seo-score/
   api/seo-score.py      # Serverless endpoint (Vercel): validatie, rate limit, lead-webhook
   widget.js             # Inbedbaar formulier + resultaatweergave (vanilla JS, geen dependencies)
   index.html            # Previewpagina
+  dev_server.py         # Lokale testserver (widget + echte API)
   vercel.json           # Functie-timeout + caching widget
   requirements.txt      # requests + beautifulsoup4
 ```
@@ -133,8 +134,17 @@ Payload:
 
 ## Lokaal testen
 
+De widget met echte analyse in je browser, zonder Vercel:
+
 ```bash
 pip install -r web/seo-score/requirements.txt
+python3 web/seo-score/dev_server.py        # opent http://localhost:8000
+```
+
+Leads worden dan in de terminal getoond in plaats van naar een webhook
+gestuurd. Alleen de analyse (JSON) of de tests:
+
+```bash
 python3 web/seo-score/seo_score_engine.py https://voorbeeld.nl
 python3 -m pytest tests/test_seo_score_widget.py
 ```
