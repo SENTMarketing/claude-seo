@@ -92,6 +92,13 @@
     ".sss-item strong{font:700 15px/1.3 var(--sss-head-font);color:var(--sss-heading)}" +
     ".sss-num{grid-row:span 2;width:28px;height:28px;border-radius:50%;background:var(--sss-accent);color:var(--sss-navy);font:800 13px/28px var(--sss-head-font);text-align:center}" +
     ".sss-dot{grid-row:span 2;width:10px;height:10px;border-radius:50%;margin:6px 9px 0}" +
+    ".sss-save{margin-top:20px;padding:18px 20px;border-radius:16px;border:1px dashed var(--sss-accent);display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}" +
+    ".sss-save>div{display:grid;gap:2px;min-width:0;flex:1 1 240px;font-size:14px}" +
+    ".sss-save strong{font:700 16px/1.3 var(--sss-head-font);color:var(--sss-heading)}" +
+    ".sss-save-msg{color:var(--sss-bad);font-size:13px}" +
+    ".sss-save-msg:empty{display:none}" +
+    ".sss-btn:disabled{opacity:.6;cursor:wait;transform:none;box-shadow:none}" +
+    "@media(max-width:600px){.sss-save .sss-btn{flex:1 1 100%}}" +
     ".sss-details summary{cursor:pointer;font:700 15px var(--sss-head-font);color:var(--sss-accent);margin:20px 0 12px}" +
     ".sss-cta{margin-top:32px;padding:24px;border-radius:20px;background:var(--sss-surface);border:1px solid var(--sss-line)}" +
     ".sss-cta-title{font:800 20px/1.25 var(--sss-head-font);color:var(--sss-heading);margin:0 0 6px}" +
@@ -99,6 +106,11 @@
     ".sss-actions{display:flex;gap:12px;flex-wrap:wrap}" +
     "@media(max-width:600px){.sss-actions .sss-btn{flex:1 1 100%;padding:16px 18px;text-align:center}}" +
     ".sss-link{background:none;border:0;color:var(--sss-accent);text-decoration:underline;cursor:pointer;font:600 14px var(--sss-head-font);padding:0;margin-top:16px}";
+
+  function track(payload) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(payload);
+  }
 
   function el(tag, attrs, children) {
     var n = document.createElement(tag);
@@ -152,6 +164,208 @@
     return s;
   }
 
+  // ---- PDF report ---------------------------------------------------------
+  // jsPDF is loaded on demand (only when a visitor clicks the download button).
+  var JSPDF_SRC = "https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js";
+  var JSPDF_SRI = "sha384-qovJwSBbRDPP5cEjCp8S0UP66wrvnjaa60XMOGzTNanrThcrGfXfnZkvgY8N1KT3";
+  var jspdfPromise = null;
+
+  function loadJsPDF() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf.jsPDF);
+    if (!jspdfPromise) {
+      jspdfPromise = new Promise(function (resolve, reject) {
+        var s = document.createElement("script");
+        s.src = JSPDF_SRC;
+        s.integrity = JSPDF_SRI;
+        s.crossOrigin = "anonymous";
+        s.async = true;
+        s.onload = function () {
+          if (window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf.jsPDF);
+          else reject(new Error("jsPDF niet beschikbaar"));
+        };
+        s.onerror = function () { jspdfPromise = null; reject(new Error("jsPDF laden mislukt")); };
+        document.head.appendChild(s);
+      });
+    }
+    return jspdfPromise;
+  }
+
+  // Standard PDF fonts only cover Latin-1 (+ a few typographic marks).
+  function pdfText(t) {
+    return String(t == null ? "" : t)
+      .replace(/→/g, "-")
+      .replace(/[^\x00-\xFF€–—‘’“”•…]/g, "");
+  }
+
+  function phoneLabel(num) {
+    return /^316\d{8}$/.test(num)
+      ? "06 " + num.slice(3).replace(/(\d{3})(\d{3})(\d{2})/, "$1 $2 $3")
+      : "+" + num;
+  }
+
+  function buildPdf(JsPDF, r, o) {
+    var NAVY = [16, 23, 59], ACCENT = [63, 169, 245], LAV = [224, 230, 255], SUB = [157, 165, 197],
+      BLOCK = [74, 81, 110], LINE = [214, 219, 238];
+    var STATUS = { goed: [31, 157, 107], matig: [199, 134, 26], slecht: [209, 67, 67] };
+    var STATUS_LABEL = { goed: "Goed", matig: "Matig", slecht: "Slecht" };
+    function scoreColor(v) { return v >= 80 ? STATUS.goed : v >= 50 ? STATUS.matig : STATUS.slecht; }
+
+    var doc = new JsPDF({ unit: "mm", format: "a4" });
+    var W = 210, H = 297, M = 18, CW = W - 2 * M, BOTTOM = H - 22, y;
+    var site = r.final_url || r.url;
+
+    function color(c) { doc.setTextColor(c[0], c[1], c[2]); }
+    function font(style, size) { doc.setFont("helvetica", style); doc.setFontSize(size); }
+    function ensure(h) { if (y + h > BOTTOM) { doc.addPage(); y = 22; } }
+    function lines(text, width) { return doc.splitTextToSize(pdfText(text), width); }
+    function heading(text) {
+      ensure(16);
+      font("bold", 14); color(NAVY);
+      doc.text(pdfText(text), M, y);
+      y += 8;
+    }
+
+    // Header band
+    doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+    doc.rect(0, 0, W, 62, "F");
+    font("bold", 9); color(ACCENT);
+    doc.text("SENT MARKETING", M, 17);
+    font("bold", 24); color(LAV);
+    doc.text("SEO-rapport", M, 30);
+    font("normal", 11); color(LAV);
+    doc.text(lines(site, 120)[0], M, 39);
+    font("normal", 9); color(SUB);
+    doc.text(pdfText("Gemaakt op " + new Date().toLocaleDateString("nl-NL", { day: "numeric", month: "long", year: "numeric" })), M, 46);
+
+    // Score badge
+    var cx = W - M - 20, cy = 33, sc = scoreColor(r.score);
+    doc.setDrawColor(sc[0], sc[1], sc[2]);
+    doc.setLineWidth(2.4);
+    doc.circle(cx, cy, 17, "S");
+    font("bold", 26); color(LAV);
+    doc.text(String(r.score), cx, cy + 3, { align: "center" });
+    font("normal", 8); color(SUB);
+    doc.text("van 100", cx, cy + 9, { align: "center" });
+
+    // Summary
+    y = 76;
+    font("bold", 17); color(NAVY);
+    doc.text(pdfText(r.grade), M, y);
+    y += 7;
+    if (r.counts) {
+      font("normal", 10); color(BLOCK);
+      doc.text(r.counts.goed + " goed  •  " + r.counts.matig + " matig  •  " + r.counts.slecht + " slecht", M, y);
+      y += 10;
+    }
+
+    // Category bars
+    Object.keys(r.categories || {}).forEach(function (k) {
+      var c = r.categories[k], bx = 82, bw = 92, col = scoreColor(c.score);
+      font("normal", 10); color(NAVY);
+      doc.text(pdfText(c.label), M, y);
+      doc.setFillColor(LAV[0], LAV[1], LAV[2]);
+      doc.roundedRect(bx, y - 2.6, bw, 3, 1.5, 1.5, "F");
+      if (c.score > 0) {
+        doc.setFillColor(col[0], col[1], col[2]);
+        doc.roundedRect(bx, y - 2.6, Math.max(3, bw * c.score / 100), 3, 1.5, 1.5, "F");
+      }
+      font("bold", 10);
+      doc.text(c.score + "%", W - M, y, { align: "right" });
+      y += 8;
+    });
+    y += 4;
+
+    // Top priorities
+    if (r.top_priorities && r.top_priorities.length) {
+      heading("Hier begin je mee");
+      r.top_priorities.forEach(function (p, i) {
+        font("normal", 10);
+        var adv = lines(p.advice, CW - 12);
+        ensure(8 + adv.length * 4.6);
+        doc.setFillColor(ACCENT[0], ACCENT[1], ACCENT[2]);
+        doc.circle(M + 3.5, y - 1.3, 3.5, "F");
+        font("bold", 9); color(NAVY);
+        doc.text(String(i + 1), M + 3.5, y + 0.2, { align: "center" });
+        font("bold", 11); color(NAVY);
+        doc.text(pdfText(p.label), M + 12, y);
+        font("normal", 10); color(BLOCK);
+        doc.text(adv, M + 12, y + 5);
+        y += 8 + adv.length * 4.6;
+      });
+      y += 4;
+    }
+
+    // All checks, grouped by category
+    heading("Alle controles");
+    Object.keys(r.categories || {}).forEach(function (k) {
+      var items = (r.checks || []).filter(function (c) { return c.category === k; });
+      if (!items.length) return;
+      ensure(14);
+      font("bold", 9); color(ACCENT);
+      doc.text(pdfText(r.categories[k].label.toUpperCase()), M, y);
+      y += 5;
+      items.forEach(function (c) {
+        font("normal", 9.5);
+        var body = lines(c.message + (c.advice ? " " + c.advice : ""), CW - 8);
+        var h = 5 + body.length * 4.3 + 2;
+        ensure(h);
+        var st = STATUS[c.status] || BLOCK;
+        doc.setFillColor(st[0], st[1], st[2]);
+        doc.circle(M + 1.6, y - 1.2, 1.6, "F");
+        font("bold", 10.5); color(NAVY);
+        doc.text(pdfText(c.label), M + 7, y);
+        font("bold", 9); color(st);
+        doc.text(STATUS_LABEL[c.status] || "", W - M, y, { align: "right" });
+        font("normal", 9.5); color(BLOCK);
+        doc.text(body, M + 7, y + 4.6);
+        y += h;
+        doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+        doc.setLineWidth(0.2);
+        doc.line(M + 7, y - 1, W - M, y - 1);
+        y += 5;
+      });
+      y += 3;
+    });
+
+    // Call to action
+    font("normal", 10);
+    var ctaBody = lines(o.ctaBody, CW - 16);
+    var boxH = 22 + ctaBody.length * 4.8 + (o.whatsapp ? 6 : 0);
+    ensure(boxH + 4);
+    y += 2;
+    doc.setFillColor(LAV[0], LAV[1], LAV[2]);
+    doc.roundedRect(M, y, CW, boxH, 4, 4, "F");
+    var ty = y + 9;
+    font("bold", 13); color(NAVY);
+    doc.text(lines(o.ctaTitle, CW - 16), M + 8, ty);
+    ty += 6 * lines(o.ctaTitle, CW - 16).length;
+    font("normal", 10); color(BLOCK);
+    doc.text(ctaBody, M + 8, ty);
+    ty += ctaBody.length * 4.8 + 2;
+    font("bold", 10); color(NAVY);
+    doc.textWithLink(pdfText(o.ctaText + ": " + o.ctaUrl.replace(/^https?:\/\//, "")), M + 8, ty, { url: o.ctaUrl });
+    if (o.whatsapp) {
+      ty += 6;
+      doc.textWithLink("WhatsApp: " + phoneLabel(o.whatsapp), M + 8, ty, { url: "https://wa.me/" + o.whatsapp });
+    }
+
+    // Footer on every page
+    var pages = doc.getNumberOfPages();
+    for (var i = 1; i <= pages; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(LINE[0], LINE[1], LINE[2]);
+      doc.setLineWidth(0.3);
+      doc.line(M, H - 14, W - M, H - 14);
+      font("normal", 8); color(SUB);
+      doc.text(pdfText("SENT Marketing  •  " + o.siteHost + "  •  Geen marketingpraat. Gewoon resultaat."), M, H - 9);
+      doc.text("Pagina " + i + " van " + pages, W - M, H - 9, { align: "right" });
+    }
+
+    var host = "";
+    try { host = new URL(site).hostname.replace(/^www\./, ""); } catch (e) { host = "website"; }
+    doc.save("SEO-rapport-" + host + "-" + new Date().toISOString().slice(0, 10) + ".pdf");
+  }
+
   function init(root) {
     if (root.dataset.sssReady) return;
     root.dataset.sssReady = "1";
@@ -159,6 +373,8 @@
     var privacyUrl = root.dataset.privacyUrl || "/privacy";
     var ctaUrl = root.dataset.ctaUrl || "/contact";
     var ctaText = root.dataset.ctaText || "Plan een kennismaking";
+    var ctaTitle = root.dataset.ctaTitle || "Geen lijst die in een la verdwijnt, maar een betere score.";
+    var ctaBody = "Je spreekt direct met Stan of Timo, geen accountmanager. Binnen 24 uur contact.";
     var whatsapp = (root.dataset.whatsapp || "").replace(/\D/g, "");
     var title = root.dataset.title || "Je SEO-score in 15 seconden.";
     var intro = root.dataset.intro || "Vul je website en e-mailadres in. Geen verkooppraatje, gewoon je score en wat je eraan kunt doen.";
@@ -229,7 +445,7 @@
         .then(function (res) {
           if (!res.ok) throw new Error(res.body && res.body.error || "Er ging iets mis.");
           renderResult(res.body, data);
-          if (window.dataLayer) window.dataLayer.push({ event: "seo_score_generated", seo_score: res.body.score });
+          track({ event: "seo_score_generated", seo_score: res.body.score });
         })
         .catch(function (e) {
           renderForm(data);
@@ -279,6 +495,33 @@
         card.appendChild(list);
       }
 
+      var pdfBtn = el("button", { type: "button", class: "sss-btn", text: "Download als PDF" });
+      var pdfMsg = el("span", { class: "sss-save-msg", role: "status", "aria-live": "polite" });
+      pdfBtn.addEventListener("click", function () {
+        pdfBtn.disabled = true;
+        pdfBtn.textContent = "PDF maken…";
+        pdfMsg.textContent = "";
+        loadJsPDF()
+          .then(function (JsPDF) {
+            buildPdf(JsPDF, r, {
+              ctaTitle: ctaTitle, ctaBody: ctaBody, ctaText: ctaText,
+              ctaUrl: new URL(ctaUrl, location.href).href, whatsapp: whatsapp,
+              siteHost: new URL(ctaUrl, location.href).hostname.replace(/^www\./, "")
+            });
+            track({ event: "seo_score_pdf_download", seo_score: r.score });
+          })
+          .catch(function () { pdfMsg.textContent = "Downloaden lukte niet. Probeer het opnieuw."; })
+          .then(function () { pdfBtn.disabled = false; pdfBtn.textContent = "Download als PDF"; });
+      });
+      card.appendChild(el("div", { class: "sss-save" }, [
+        el("div", {}, [
+          el("strong", { text: "Bewaar je verbeterlijst" }),
+          el("span", { text: "Alle " + (r.checks || []).length + " controles en adviezen in één PDF." }),
+          pdfMsg
+        ]),
+        pdfBtn
+      ]));
+
       var details = el("details", { class: "sss-details" }, [el("summary", { text: "Bekijk alle " + (r.checks || []).length + " controles" })]);
       var all = el("ul", { class: "sss-list" });
       (r.checks || []).forEach(function (c) {
@@ -300,8 +543,8 @@
       var again = el("button", { type: "button", class: "sss-link", text: "Andere website checken" });
       again.addEventListener("click", function () { renderForm({ email: data.email }); });
       card.appendChild(el("div", { class: "sss-cta" }, [
-        el("p", { class: "sss-cta-title", text: "Geen lijst die in een la verdwijnt, maar een betere score." }),
-        el("p", { text: "Je spreekt direct met Stan of Timo, geen accountmanager. Binnen 24 uur contact." }),
+        el("p", { class: "sss-cta-title", text: ctaTitle }),
+        el("p", { text: ctaBody }),
         actions,
         again
       ]));

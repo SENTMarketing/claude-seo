@@ -67,6 +67,7 @@ Voeg op de SEO-pagina een **Embed**-element (Webflow) of **Aangepaste HTML**-blo
 | `data-cta-url` / `data-cta-text` | `/contact` / "Plan een kennismaking" | Hoofdknop na de uitslag |
 | `data-whatsapp` | leeg (geen knop) | Nummer in internationaal formaat; toont een WhatsApp-knop met de score als vooringevuld bericht |
 | `data-theme` | `donker` | `donker` (navy kaart) of `licht` (lavendel kaart, voor lichte secties) |
+| `data-cta-title` | zie widget | Kop van het afsluitende contactblok (ook in de PDF) |
 | `data-title` / `data-intro` | "Je SEO-score in 15 seconden." / standaardintro | Eigen kop en introtekst |
 
 ### Huisstijl
@@ -92,6 +93,19 @@ Kleuren zijn CSS-variabelen en kunnen per pagina worden overschreven:
 
 Na een succesvolle scan wordt een `seo_score_generated`-event naar de
 `dataLayer` gepusht (Google Tag Manager / GA4-conversie).
+
+## PDF-rapport
+
+Na de uitslag kan de bezoeker met één klik een **PDF-rapport** downloaden
+(knop "Download als PDF"). Het rapport bevat de score, de categorieën, de vijf
+belangrijkste verbeterpunten, alle controles met advies en het contactblok
+(kennismaking + WhatsApp), in de SENT-huisstijl.
+
+- Wordt in de browser van de bezoeker gemaakt met jsPDF (geen serverbelasting,
+  er wordt niets extra opgeslagen).
+- jsPDF wordt pas geladen bij een klik, vanaf jsDelivr met een
+  integrity-hash (SRI).
+- GA4/GTM-event bij downloaden: `seo_score_pdf_download`.
 
 ## 3. Leads opvolgen (Make-voorbeeld)
 
