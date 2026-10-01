@@ -373,7 +373,7 @@
     var privacyUrl = root.dataset.privacyUrl || "/privacy";
     var ctaUrl = root.dataset.ctaUrl || "/contact";
     var ctaText = root.dataset.ctaText || "Plan een kennismaking";
-    var ctaTitle = root.dataset.ctaTitle || "Geen lijst die in een la verdwijnt, maar een betere score.";
+    var ctaTitle = root.dataset.ctaTitle || "Je weet nu waar je staat. Tijd om koers te zetten.";
     var ctaBody = "Je spreekt direct met Stan of Timo, geen accountmanager. Binnen 24 uur contact.";
     var whatsapp = (root.dataset.whatsapp || "").replace(/\D/g, "");
     var title = root.dataset.title || "Je SEO-score in 15 seconden.";
