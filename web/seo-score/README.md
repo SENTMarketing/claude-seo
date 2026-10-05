@@ -11,9 +11,15 @@ web/seo-score/
   api/seo-score.py      # Serverless endpoint (Vercel): validatie, rate limit, lead-webhook
   widget.js             # Inbedbaar formulier + resultaatweergave (vanilla JS, geen dependencies)
   index.html            # Previewpagina
-  dev_server.py         # Lokale testserver (widget + echte API)
-  vercel.json           # Functie-timeout + caching widget
-  requirements.txt      # requests + beautifulsoup4
+  dev_server.py         # Lokale testserver (beide tools + echte API)
+  lead_common.py        # Gedeeld: validatie, toestemming, honeypot, rate limit, CORS, lead-webhook
+  makeover_engine.py    # Website-makeover: huisstijl + content uit een website halen
+  makeover_ai.py        # Website-makeover: teksten herschrijven met Claude (optioneel)
+  api/site-makeover.py  # Serverless endpoint voor de website-makeover
+  makeover.js           # Inbedbare website-makeover widget
+  makeover.html         # Previewpagina website-makeover
+  vercel.json           # Functie-timeouts + caching widgets
+  requirements.txt      # requests + beautifulsoup4 + anthropic
 ```
 
 ## Wat wordt er gemeten?
@@ -107,6 +113,63 @@ belangrijkste verbeterpunten, alle controles met advies en het contactblok
   integrity-hash (SRI).
 - GA4/GTM-event bij downloaden: `seo_score_pdf_download`.
 
+## Website-makeover (tweede tool)
+
+Een bezoeker vult zijn website en e-mailadres in en ziet binnen een halve
+minuut een **nieuw homepage-ontwerp in zijn eigen huisstijl**: met zijn logo,
+merkkleuren, lettertypes, foto's, menu, diensten en contactgegevens. Doel:
+direct laten zien dat SENT de site mooier kan maken, en een lead opleveren.
+
+```html
+<div id="sent-site-makeover"
+     data-api="https://<project>.vercel.app/api/site-makeover"
+     data-privacy-url="/privacy"
+     data-cta-url="/contact"
+     data-whatsapp="31620405236"></div>
+<script src="https://<project>.vercel.app/makeover.js" defer></script>
+```
+
+Optionele attributen: `data-title`, `data-intro`, `data-cta-title`,
+`data-cta-text`.
+
+**Hoe het werkt**
+
+1. `makeover_engine.py` haalt de pagina en maximaal 4 stylesheets op (zelfde
+   SSRF-bescherming als de SEO-checker) en bepaalt:
+   - naam (og:site_name of paginatitel), logo (img met "logo" in header/nav, of touch-icon);
+   - merkkleuren: kleuren uit CSS, `theme-color` en CSS-variabelen, gewogen
+     (knoppen en `--primary`/`--brand` tellen zwaarder), grijs/wit/zwart uitgesloten;
+   - lettertypes: Google Fonts-links en `font-family` van koppen en body;
+   - content: H1, meta description, menu, H2/H3-koppen, alinea's, knopteksten,
+     telefoon en e-mail; afbeeldingen: og:image en grote content-afbeeldingen.
+2. `makeover_ai.py` laat Claude (`claude-opus-5-5`, effort `low`, JSON-schema)
+   de teksten aanscherpen: kop, subkop, 3 USP's, diensten, over-ons, contactblok.
+   Claude mag **niets verzinnen** (geen reviews, cijfers, jaartallen, prijzen);
+   de websitetekst gaat als afgebakende data mee, nooit als instructie. Zonder
+   `ANTHROPIC_API_KEY`, bij een fout of weigering gebruikt de tool de eigen
+   teksten van de site.
+3. `makeover.js` bouwt het concept in een **sandboxed iframe** (geen scripts)
+   met desktop/mobiel-schakelaar. Kleuren worden gevalideerd, tekst wordt
+   ge-escaped, afbeeldingen die niet laden (hotlink-bescherming) worden
+   vervangen door een kleurverloop. Merkkleur als tekst wordt zo nodig
+   donkerder gemaakt voor voldoende contrast (WCAG 4.5:1).
+
+Extra environment variables op Vercel:
+
+| Variabele | Standaard | Doel |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | leeg | Zet AI-teksten aan |
+| `MAKEOVER_MODEL` | `claude-opus-5-5` | Ander model |
+| `MAKEOVER_EFFORT` | `low` | Hoger = betere teksten, langzamer |
+
+Lead-payload (`tool: "site-makeover"`): `email`, `url`, `final_url`,
+`company`, `colors`, `fonts`, `phone`, `ai_copy`, `source`, `created_at`.
+GA4-event: `site_makeover_generated`.
+
+Let op: het concept is een automatische schets van de homepage, geen echt
+ontwerp. Het toont alleen data van de opgegeven website en wordt nergens
+opgeslagen of gepubliceerd.
+
 ## 3. Leads opvolgen (Make-voorbeeld)
 
 1. Make → nieuw scenario → **Webhooks → Custom webhook**, kopieer de URL naar
@@ -153,6 +216,7 @@ De widget met echte analyse in je browser, zonder Vercel:
 ```bash
 pip install -r web/seo-score/requirements.txt
 python3 web/seo-score/dev_server.py        # opent http://localhost:8000
+# website-makeover: http://localhost:8000/makeover.html
 ```
 
 Leads worden dan in de terminal getoond in plaats van naar een webhook
