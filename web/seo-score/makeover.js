@@ -23,7 +23,7 @@
   var CSS = "" +
     ".smo{--smo-navy:#10173B;--smo-accent:#3FA9F5;--smo-lavender:#E0E6FF;--smo-sub:#9DA5C5;--smo-bad:#F26D6D;" +
     "--smo-line:rgba(224,230,255,.14);--smo-surface:rgba(224,230,255,.06);--smo-input:rgba(224,230,255,.08);" +
-    "--smo-head:Montserrat,system-ui,sans-serif;font-family:inherit;color:var(--smo-sub);max-width:1080px;margin:0 auto;box-sizing:border-box;line-height:1.55}" +
+    "--smo-head:Montserrat,system-ui,sans-serif;font-family:inherit;color:var(--smo-sub);max-width:1080px;min-width:0;margin:0 auto;box-sizing:border-box;line-height:1.55}" +
     ".smo *{box-sizing:border-box}" +
     ".smo-card{position:relative;overflow:hidden;overflow:clip;background:var(--smo-navy);border-radius:24px;padding:40px 36px;isolation:isolate}" +
     "@media(max-width:600px){.smo-card{padding:28px 18px;border-radius:20px}}" +
@@ -49,7 +49,7 @@
     ".smo-ghost{background:transparent;color:var(--smo-lavender);border:1px solid var(--smo-line)}" +
     ".smo-ghost:hover{box-shadow:none;border-color:var(--smo-accent)}" +
     ".smo-form .smo-btn{justify-self:start}" +
-    "@media(max-width:600px){.smo-form .smo-btn,.smo-actions .smo-btn{width:100%;padding:16px 18px}}" +
+    "@media(max-width:600px){.smo-form .smo-btn,.smo-actions .smo-btn{width:100%;padding:15px 14px;font-size:15px;text-align:center}}" +
     ".smo-error{color:var(--smo-bad);font-size:14px;min-height:1em}" +
     ".smo-steps{list-style:none;padding:0;margin:8px auto 0;display:grid;gap:12px;max-width:420px}" +
     ".smo-steps li{display:flex;gap:12px;align-items:center;font-size:15px;color:var(--smo-sub);transition:color .3s}" +
@@ -77,7 +77,7 @@
     ".smo-bar i{width:10px;height:10px;border-radius:50%;background:rgba(224,230,255,.2);display:block}" +
     ".smo-addr{flex:1;min-width:0;margin-left:8px;background:rgba(224,230,255,.08);border-radius:48px;padding:5px 14px;font-size:12px;color:var(--smo-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
     ".smo-view{position:relative;overflow:hidden;background:#fff}" +
-    ".smo-view iframe{border:0;display:block;transform-origin:0 0;background:#fff}" +
+    ".smo-view iframe{position:absolute;left:0;top:0;border:0;display:block;transform-origin:0 0;background:#fff}" +
     ".smo-note{font-size:13px;margin:14px 0 0}" +
     ".smo-cta{margin-top:32px;padding:24px;border-radius:20px;background:var(--smo-surface);border:1px solid var(--smo-line)}" +
     ".smo-cta-title{font:800 20px/1.25 var(--smo-head);color:var(--smo-lavender);margin:0 0 6px}" +
