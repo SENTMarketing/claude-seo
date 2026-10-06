@@ -4,7 +4,8 @@ Site makeover engine: extract a website's brand and content for a redesign previ
 
 Fetches one public URL (plus up to 4 of its stylesheets) and returns the
 brand identity (name, logo, colours, fonts), the key content (headline,
-description, services, navigation, contact details) and usable images. The
+description, services, navigation, contact details), the industry, a list
+of concrete improvements and usable images (inlined as data: URIs). The
 widget renders this into a modern page template in the site's own house
 style, optionally with copy rewritten by Claude (see makeover_ai.py).
 
@@ -21,6 +22,7 @@ Output: JSON on stdout.
 from __future__ import annotations
 
 import argparse
+import base64
 import colorsys
 import json
 import re
@@ -31,7 +33,7 @@ from urllib.parse import urljoin, urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from seo_score_engine import ScoreError, normalize_input_url, safe_get
+from seo_score_engine import ScoreError, analyze_html, normalize_input_url, safe_get
 
 MAX_STYLESHEETS = 4
 MAX_CSS_BYTES = 400_000
@@ -306,6 +308,125 @@ def extract_content(soup: BeautifulSoup, base: str) -> dict:
     }
 
 
+# --------------------------------------------------------------------------- #
+# Industry, improvements, missing brand input
+# --------------------------------------------------------------------------- #
+
+# Layout groups the concept template knows. AI copy may pick one too; anything
+# else renders the generic layout with industry-specific wording from the copy.
+INDUSTRIES = ("groen_bouw", "zorg", "financieel", "webshop", "overig")
+INDUSTRY_KEYWORDS = {
+    "groen_bouw": (
+        "hovenier", "tuinaanleg", "tuinonderhoud", "bestrating", "installat", "loodgieter",
+        "elektric", "dakdekker", "aannemer", "bouwbedrijf", "verbouw", "schilder", "klussen",
+        "warmtepomp", "zonnepanel", "cv-ketel", "timmer", "stukadoor", "renovatie", "kozijn",
+    ),
+    "zorg": (
+        "fysiotherap", "therapeut", "behandeling", "praktijk", "patiënt", "patient", "zorg",
+        "tandarts", "osteopa", "psycholo", "diëtist", "dietist", "podotherap", "massage",
+        "kliniek", "verwijzing", "zorgverzeker",
+    ),
+    "financieel": (
+        "hypothe", "financieel advies", "financiële", "verzekering", "boekhoud", "administratie",
+        "accountant", "belastingaangifte", "pensioen", "vermogen", "financiering",
+    ),
+    "webshop": (
+        "winkelwagen", "winkelmand", "in mijn mand", "webshop", "gratis verzending", "retourneren",
+        "add to cart", "woocommerce", "shopify", "op voorraad", "afrekenen",
+    ),
+}
+DEFAULT_CTA = {
+    "groen_bouw": "Vraag een offerte aan",
+    "zorg": "Maak een afspraak",
+    "financieel": "Plan een kennismakingsgesprek",
+    "webshop": "Bekijk het assortiment",
+    "overig": "Neem contact op",
+}
+
+
+def classify_industry(html: str) -> str:
+    """Keyword vote over the page text; 'overig' when nothing clearly wins."""
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True).lower()
+    raw = html.lower()
+    scores = {
+        group: sum(text.count(k) for k in words) + (3 if group == "webshop" and any(
+            k in raw for k in ("woocommerce", "shopify", "add-to-cart")) else 0)
+        for group, words in INDUSTRY_KEYWORDS.items()
+    }
+    best = max(scores, key=scores.get)
+    return best if scores[best] >= 2 else "overig"
+
+
+def improvements(html: str, final_url: str, content: dict) -> list[dict]:
+    """What the concept does better than the current homepage. Only true statements."""
+    checks = {c["id"]: c for c in analyze_html(html, final_url)}
+    out = [
+        {"title": "Eén duidelijke boodschap bovenaan",
+         "text": "Een korte kop, een uitleg in één zin en één hoofdknop direct in beeld."},
+    ]
+    if checks.get("viewport", {}).get("status") != "goed":
+        out.append({"title": "Goed leesbaar op je telefoon",
+                    "text": "Je huidige site mist een mobiele instelling; het concept past zich aan elk scherm aan."})
+    else:
+        out.append({"title": "Gemaakt voor mobiel",
+                    "text": "Grote knoppen en korte blokken die op een telefoon net zo goed werken als op desktop."})
+    if not content.get("ctas"):
+        out.append({"title": "Duidelijke knop naar contact",
+                    "text": "Je homepage heeft nu geen opvallende contactknop. In het concept staat die op drie plekken."})
+    if content.get("phone"):
+        out.append({"title": "Telefoonnummer direct zichtbaar",
+                    "text": "Je nummer staat bovenaan en in het contactblok, zodat bezoekers sneller bellen."})
+    if len(content.get("headings") or []) >= 2:
+        out.append({"title": "Diensten overzichtelijk",
+                    "text": "Je diensten staan in heldere blokken in plaats van in lange tekst."})
+    if checks.get("h1", {}).get("status") != "goed":
+        out.append({"title": "Eén duidelijke hoofdkop",
+                    "text": "Je huidige pagina heeft geen of meerdere H1-koppen. Het concept heeft er precies één."})
+    if checks.get("meta_description", {}).get("status") == "slecht":
+        out.append({"title": "Klaar voor Google",
+                    "text": "Je homepage heeft geen meta description. Bij de bouw schrijven we die mee, zodat je beter opvalt in Google."})
+    if checks.get("https", {}).get("status") == "slecht":
+        out.append({"title": "Veilige verbinding",
+                    "text": "Je site gebruikt nu geen HTTPS. Een nieuwe site krijgt dat standaard."})
+    return out[:6]
+
+
+def needs_input(site: dict) -> dict:
+    """Which brand parts the visitor should fill in because we could not find them."""
+    return {"color": not site["brand"]["colors"].get("primary"), "logo": not site["brand"].get("logo")}
+
+
+def inline_image(url: str | None, max_bytes: int) -> str | None:
+    """Fetch an image (SSRF-safe) and return it as a data: URI, or None.
+
+    Inlining makes the concept self-contained: no hotlink blocks, no referrer
+    leaks, and the browser can turn it into a PDF without tainted canvases.
+    """
+    if not url:
+        return None
+    try:
+        resp, _, _ = safe_get(url, timeout=6)
+    except (requests.RequestException, ScoreError):
+        return None
+    ctype = resp.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    if resp.status_code != 200 or not re.match(r"^image/(jpeg|png|webp|gif|avif|svg\+xml)$", ctype):
+        return None
+    data = resp.content
+    if not data or len(data) > max_bytes:
+        return None
+    return f"data:{ctype};base64," + base64.b64encode(data).decode()
+
+
+def inline_images(site: dict) -> None:
+    """Replace logo, hero and the first gallery image with data URIs (in place)."""
+    site["brand"]["logo"] = inline_image(site["brand"].get("logo"), 400_000)
+    images = site["images"]
+    images["hero"] = inline_image(images.get("hero"), 1_500_000)
+    first = next((g for g in images.get("gallery") or []), None)
+    gallery = inline_image(first, 1_000_000)
+    images["gallery"] = [gallery] if gallery else []
+
+
 def analyze_site(html: str, final_url: str, css_text: str = "") -> dict:
     """Extract brand + content from fetched HTML and CSS. Pure function (no network)."""
     soup = BeautifulSoup(html, "html.parser")
@@ -327,6 +448,7 @@ def analyze_site(html: str, final_url: str, css_text: str = "") -> dict:
         "content": extract_content(soup, final_url),
         "images": _images(soup, final_url, logo),
         "lang": (html_tag.get("lang") if html_tag else None) or "nl",
+        "industry": classify_industry(html),
     }
 
 
@@ -366,7 +488,11 @@ def makeover_url(raw_url: str) -> dict:
         raise ScoreError("Deze URL is geen webpagina (HTML).")
     html = resp.text
     css = fetch_stylesheets(BeautifulSoup(html, "html.parser"), final_url)
-    return {"url": url, "final_url": final_url, **analyze_site(html, final_url, css)}
+    site = {"url": url, "final_url": final_url, **analyze_site(html, final_url, css)}
+    site["improvements"] = improvements(html, final_url, site["content"])
+    inline_images(site)
+    site["needs_input"] = needs_input(site)
+    return site
 
 
 def main() -> None:
@@ -378,7 +504,10 @@ def main() -> None:
         if args.html_file:
             with open(args.html_file, encoding="utf-8") as fh:
                 url = normalize_input_url(args.url)
-                result = {"url": url, "final_url": url, **analyze_site(fh.read(), url)}
+                html = fh.read()
+                result = {"url": url, "final_url": url, **analyze_site(html, url)}
+                result["improvements"] = improvements(html, url, result["content"])
+                result["needs_input"] = needs_input(result)
         else:
             result = makeover_url(args.url)
     except ScoreError as exc:

@@ -168,3 +168,82 @@ def test_lead_fields(site):
     assert fields["company"] == "Hoveniersbedrijf Lindehout"
     assert fields["phone"] == "033 123 45 67"
     assert "#4a7c2a" in fields["colors"]
+
+
+# --- industry, improvements, missing input, inlined images -------------------
+
+def test_industry_from_keywords(site):
+    assert site["industry"] == "groen_bouw"
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Fysiotherapie praktijk. Maak een afspraak voor je behandeling bij onze fysiotherapeut.", "zorg"),
+    ("Onafhankelijk hypotheekadvies en financieel advies. Hypotheek nodig?", "financieel"),
+    ("Gratis verzending vanaf 50 euro. Bekijk je winkelwagen en ga naar afrekenen.", "webshop"),
+    ("Wij maken mooie dingen.", "overig"),
+])
+def test_classify_industry(text, expected):
+    assert engine.classify_industry(f"<html><body><p>{text}</p></body></html>") == expected
+
+
+def test_improvements_are_specific(site):
+    with open(os.path.join(_FIX, "index.html"), encoding="utf-8") as fh:
+        html = fh.read()
+    items = engine.improvements(html, BASE, site["content"])
+    titles = [i["title"] for i in items]
+    assert titles[0] == "Eén duidelijke boodschap bovenaan"
+    assert "Goed leesbaar op je telefoon" in titles  # fixture has no viewport meta
+    assert "Telefoonnummer direct zichtbaar" in titles
+    assert "Duidelijke knop naar contact" not in titles  # fixture has a CTA button
+    assert len(items) <= 6
+
+
+def test_needs_input():
+    site = {"brand": {"logo": None, "colors": {"primary": None}}}
+    assert engine.needs_input(site) == {"color": True, "logo": True}
+    site = {"brand": {"logo": "data:image/png;base64,AA", "colors": {"primary": "#123456"}}}
+    assert engine.needs_input(site) == {"color": False, "logo": False}
+
+
+def _resp(ctype, body, status=200):
+    return SimpleNamespace(status_code=status, headers={"Content-Type": ctype}, content=body)
+
+
+def test_inline_image_data_uri():
+    with patch.object(engine, "safe_get", return_value=(_resp("image/png", b"\x89PNG"), "", [])):
+        assert engine.inline_image("https://x.nl/a.png", 1000) == "data:image/png;base64,iVBORw=="
+
+
+@pytest.mark.parametrize("ctype,body,status", [
+    ("text/html", b"<html>", 200),
+    ("image/png", b"x" * 2000, 200),
+    ("image/png", b"x", 404),
+])
+def test_inline_image_rejects(ctype, body, status):
+    with patch.object(engine, "safe_get", return_value=(_resp(ctype, body, status), "", [])):
+        assert engine.inline_image("https://x.nl/a.png", 1000) is None
+
+
+def test_inline_image_blocked_host():
+    with patch.object(engine, "safe_get", side_effect=engine.ScoreError("blocked")):
+        assert engine.inline_image("http://169.254.169.254/a.png", 1000) is None
+
+
+def test_ai_industry_and_steps_normalized(site):
+    ai = {**makeover_ai.fallback_copy(site), "industry": "raket", "steps": [{"title": f"S{i}", "text": "t"} for i in range(6)],
+          "area_text": "Amersfoort en omgeving"}
+    copy, used = makeover_ai.build_copy(site, _fake_client(json.dumps(ai)))
+    assert used is True
+    assert copy["industry"] == "overig"
+    assert len(copy["steps"]) == 4
+    assert copy["area_text"] == "Amersfoort en omgeving"
+    assert "industry" in makeover_ai.COPY_SCHEMA["required"]
+
+
+def test_fallback_copy_uses_industry_defaults():
+    site = {"brand": {"name": "Praktijk X"}, "industry": "zorg",
+            "content": {"h1": "", "description": "", "headings": [], "paragraphs": [], "ctas": []}}
+    copy = makeover_ai.fallback_copy(site)
+    assert copy["cta_primary"] == "Maak een afspraak"
+    assert copy["services_title"] == "Behandelingen"
+    assert copy["steps"] == [] and copy["area_text"] == ""

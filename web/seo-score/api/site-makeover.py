@@ -6,7 +6,10 @@ Request (JSON): same as /api/seo-score
 
 Response 200 (JSON):
     {"url", "final_url", "brand": {name, logo, colors, fonts}, "content": {...},
-     "images": {hero, gallery}, "lang", "copy": {hero_title, ..., services, usps}, "ai": bool}
+     "images": {hero, gallery}, "lang", "industry", "improvements": [{title, text}],
+     "needs_input": {color, logo}, "copy": {hero_title, ..., services, usps, steps,
+     area_text, industry}, "ai": bool}
+    Images (logo, hero, gallery) are inlined as data: URIs.
 Response 4xx (JSON): {"error": "<Dutch, user-facing message>"}
 
 Environment variables: see lead_common.py, plus ANTHROPIC_API_KEY / MAKEOVER_MODEL /
@@ -28,6 +31,7 @@ from makeover_engine import makeover_url  # noqa: E402
 def make_preview(url: str, client=None) -> dict:
     site = makeover_url(url)
     copy, ai = build_copy(site, client)
+    site["industry"] = copy["industry"]
     # Paragraphs are only needed to write copy; keep the response small.
     site["content"].pop("paragraphs", None)
     return {**site, "copy": copy, "ai": ai}
@@ -51,5 +55,6 @@ class handler(LeadHandler):  # noqa: N801 - name required by Vercel
             "colors": brand.get("colors", {}).get("found", []),
             "fonts": brand.get("fonts", {}),
             "phone": report.get("content", {}).get("phone"),
+            "industry": report.get("industry"),
             "ai_copy": report.get("ai"),
         }

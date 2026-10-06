@@ -129,8 +129,9 @@ direct laten zien dat SENT de site mooier kan maken, en een lead opleveren.
 <script src="https://<project>.vercel.app/makeover.js" defer></script>
 ```
 
-Optionele attributen: `data-title`, `data-intro`, `data-cta-title`,
-`data-cta-text`.
+Plaats hem op de webdesign-pagina. Optionele attributen: `data-title`,
+`data-intro`, `data-cta-title` (standaard "Je ziet nu hoe het kan. Tijd om
+koers te zetten."), `data-cta-text`.
 
 **Hoe het werkt**
 
@@ -141,18 +142,37 @@ Optionele attributen: `data-title`, `data-intro`, `data-cta-title`,
      (knoppen en `--primary`/`--brand` tellen zwaarder), grijs/wit/zwart uitgesloten;
    - lettertypes: Google Fonts-links en `font-family` van koppen en body;
    - content: H1, meta description, menu, H2/H3-koppen, alinea's, knopteksten,
-     telefoon en e-mail; afbeeldingen: og:image en grote content-afbeeldingen.
+     telefoon en e-mail; afbeeldingen: og:image en grote content-afbeeldingen;
+   - **branche** op trefwoorden: `groen_bouw` (hoveniers, installateurs, bouw),
+     `zorg` (fysio, praktijken), `financieel` (adviseurs, administratie),
+     `webshop` of `overig`;
+   - **wat we verbeterden**: maximaal 6 concrete punten, alleen als ze kloppen
+     (bijv. geen viewport, geen contactknop, telefoonnummer niet in beeld,
+     geen of meerdere H1's, geen meta description, geen HTTPS);
+   - logo, hoofdfoto en één extra foto worden als `data:`-URI meegestuurd
+     (max. 0,4 / 1,5 / 1 MB): geen hotlink-problemen en de PDF kan ze gebruiken.
 2. `makeover_ai.py` laat Claude (`claude-opus-5-5`, effort `low`, JSON-schema)
-   de teksten aanscherpen: kop, subkop, 3 USP's, diensten, over-ons, contactblok.
-   Claude mag **niets verzinnen** (geen reviews, cijfers, jaartallen, prijzen);
-   de websitetekst gaat als afgebakende data mee, nooit als instructie. Zonder
-   `ANTHROPIC_API_KEY`, bij een fout of weigering gebruikt de tool de eigen
-   teksten van de site.
-3. `makeover.js` bouwt het concept in een **sandboxed iframe** (geen scripts)
-   met desktop/mobiel-schakelaar. Kleuren worden gevalideerd, tekst wordt
-   ge-escaped, afbeeldingen die niet laden (hotlink-bescherming) worden
-   vervangen door een kleurverloop. Merkkleur als tekst wordt zo nodig
-   donkerder gemaakt voor voldoende contrast (WCAG 4.5:1).
+   de teksten aanscherpen: kop, subkop, 3 USP's, diensten, over-ons,
+   contactblok, de branchegroep, de werkwijze in stappen en het werkgebied.
+   Claude gebruikt de woorden van de branche ("behandelingen", "afspraak
+   maken", "offerte aanvragen") en mag **niets verzinnen** (geen reviews,
+   cijfers, jaartallen, prijzen); de websitetekst gaat als afgebakende data
+   mee, nooit als instructie. Zonder `ANTHROPIC_API_KEY`, bij een fout of
+   weigering gebruikt de tool de eigen teksten van de site met
+   branche-standaarden voor knoppen en koppen.
+3. `makeover.js`:
+   - **Aanvullen**: als logo of merkkleur niet gevonden is, vraagt de widget
+     om een kleur (kleurkiezer) en een logo (upload, max. 1 MB, alleen in de
+     browser). "Overslaan" bouwt het concept met een neutrale kleur.
+   - **Concept** in een sandboxed iframe (geen scripts), desktop/mobiel.
+     Per branche: zorg krijgt "Behandelingen" en "Maak een afspraak",
+     webshops een USP-balk en categorietegels, groen/bouw en financieel een
+     werkwijze in stappen; het werkgebied verschijnt als de site een regio noemt.
+   - **Wat we verbeterden** onder het concept.
+   - **PDF** ("Download als PDF"): titelpagina met de bovenkant van het
+     concept, mobielweergave met de verbeterpunten en het contactblok, en de
+     hele pagina. Gemaakt in de browser met html2canvas + jsPDF (pas geladen
+     bij een klik, vanaf jsDelivr met SRI).
 
 Extra environment variables op Vercel:
 
@@ -163,8 +183,17 @@ Extra environment variables op Vercel:
 | `MAKEOVER_EFFORT` | `low` | Hoger = betere teksten, langzamer |
 
 Lead-payload (`tool: "site-makeover"`): `email`, `url`, `final_url`,
-`company`, `colors`, `fonts`, `phone`, `ai_copy`, `source`, `created_at`.
-GA4-event: `site_makeover_generated`.
+`company`, `industry`, `colors`, `fonts`, `phone`, `ai_copy`, `source`,
+`created_at`. GA4-events: `site_makeover_generated` en
+`site_makeover_pdf_download`.
+
+**E-mail naar Stan en Timo (Make)**: maak een scenario met een *Custom
+webhook* (URL in `LEAD_WEBHOOK_URL`), een filter op `tool = site-makeover`
+(en een tweede route voor `seo-score`) en een *Email*-module, bijvoorbeeld:
+
+> Onderwerp: Nieuwe website-preview: {{company}} ({{industry}})
+> Tekst: {{email}} heeft een concept gemaakt voor {{final_url}}.
+> Telefoon op de site: {{phone}}. AI-teksten: {{ai_copy}}. Bel of mail binnen 24 uur.
 
 Let op: het concept is een automatische schets van de homepage, geen echt
 ontwerp. Het toont alleen data van de opgegeven website en wordt nergens
